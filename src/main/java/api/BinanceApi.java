@@ -11,6 +11,8 @@ import com.ejlchina.data.TypeRef;
 import com.ejlchina.okhttps.HTTP;
 import com.ejlchina.okhttps.HttpResult;
 import com.ejlchina.okhttps.JacksonMsgConvertor;
+import com.ejlchina.okhttps.internal.SyncHttpTask;
+import okhttp3.OkHttpClient;
 import request.*;
 import response.BuyMarketResponse;
 import response.GetTickerPriceResponse;
@@ -39,7 +41,7 @@ public class BinanceApi {
     private static final HTTP PUBLIC_URL_BUILDER = HTTP.builder().baseUrl("https://www.binance.com/exchange/public/product")
             .addMsgConvertor(new JacksonMsgConvertor()).build();
 
-    private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("#.00000000");
+    private static final Map<HTTP, Integer> CALL_NUMBER = new HashMap<>();
 
     private final String apiKey;
     private final HMac hMac;
@@ -47,6 +49,10 @@ public class BinanceApi {
     public BinanceApi(String apiKey, String apiSecret) {
         this.apiKey = apiKey;
         hMac = new HMac(HmacAlgorithm.HmacSHA256, apiSecret.getBytes());
+        CALL_NUMBER.put(BASE_URL_BUILDER, 0);
+        CALL_NUMBER.put(FUTURE_URL_BUILDER, 0);
+        CALL_NUMBER.put(BASE_URL_V3_BUILDER, 0);
+        CALL_NUMBER.put(PUBLIC_URL_BUILDER, 0);
     }
 
 
@@ -111,7 +117,7 @@ public class BinanceApi {
         HttpResult httpResult = signPost(BASE_URL_V3_BUILDER, "/order", BeanUtil.beanToMap(request));
         if (httpResult.getStatus() == 200) {
             return httpResult.getBody().toBean(SellMarketResponse.class);
-        }else {
+        } else {
             log.error("挂卖单失败,request:{},response:{},body:{}", request, httpResult, httpResult.getBody());
             return null;
         }
@@ -131,22 +137,27 @@ public class BinanceApi {
 
     private HttpResult signGet(HTTP http, String url, Map<String, Object> urlParam) {
         urlParam.put("recvWindow", 5000);
-        urlParam.put("timestamp", System.currentTimeMillis() / 1000L);
+        urlParam.put("timestamp", System.currentTimeMillis() / 500L);
         String signature = sign(urlParam);
         urlParam.put("signature", signature);
+
         return http.sync(url)
                 .addUrlPara(urlParam)
                 .addHeader("X-MBX-APIKEY", apiKey)
+                .addHeader("connection", "close")
                 .get();
+
+
     }
 
     private HttpResult signPost(HTTP http, String url, Map<String, Object> bodyParam) {
         bodyParam.put("recvWindow", 5000);
-        bodyParam.put("timestamp", System.currentTimeMillis() / 1000L);
+        bodyParam.put("timestamp", System.currentTimeMillis() / 500L);
         String signature = sign(bodyParam);
         bodyParam.put("signature", signature);
         return http.sync(url)
                 .addBodyPara(bodyParam)
+                .addHeader("connection", "close")
                 .addHeader("X-MBX-APIKEY", apiKey)
                 .post();
     }
@@ -154,13 +165,16 @@ public class BinanceApi {
     private HttpResult noSignGet(HTTP http, String url, Map<String, Object> urlParam) {
         return http.sync(url)
                 .addUrlPara(urlParam)
+                .addHeader("connection", "close")
                 .get();
+
     }
 
     private HttpResult noSignPost(HTTP http, String url, Map<String, Object> bodyParam) {
         return http.sync(url)
+                .addHeader("connection", "close")
                 .addBodyPara(bodyParam)
-                .get();
+                .post();
     }
 
     private BigDecimal formatDouble(BigDecimal val) {

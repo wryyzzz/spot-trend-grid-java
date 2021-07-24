@@ -14,6 +14,7 @@ import utils.CalculateUtil;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 
@@ -42,44 +43,51 @@ public class App extends Module {
 
     @Override
     public void start() {
-
         CalculateUtil.setBinanceApi(binanceApi);
         while (true) {
-            GetTickerPriceResponse responseBody = binanceApi.getTickerPrice(coinType);
-            if (responseBody != null) {
-                int rightSize = responseBody.price.split(".")[1].length();
-                BigDecimal curMarketPrice = new BigDecimal(responseBody.price);
-                if (nextBuyPrice.compareTo(curMarketPrice) > -1 && CalculateUtil.calculateAngle(coinType, "5m", false, rightSize)) {
-                    BuyMarketRequest request = new BuyMarketRequest();
-                    request.symbol = coinType;
-                    request.type = "MARKET";
-                    request.quantity = getQuantity(true);
-                    BuyMarketResponse buyMarketResponse = binanceApi.buyMarket(request);
-                    if (buyMarketResponse != null && buyMarketResponse.orderId != null) {
-                        dingDingApi.dingDingWarn("报警：币种为：%s。买单量为：%s.买单价格为：%s".format(coinType, request.quantity, buyMarketResponse.fills.get(0).price));
-                    } else {
-                        dingDingApi.dingDingWarn("报警：币种为：%s,买单失败".formatted(coinType));
-                    }
-                } else if (gridSellPrice.compareTo(curMarketPrice) == -1 && CalculateUtil.calculateAngle(coinType, "5m", false, rightSize)) {
-                    if (curStep == 0) {
-                        modifyPrice(gridSellPrice, curStep, curMarketPrice);
-                    } else {
-                        BigDecimal lastPrice = recordPrice.getLast();
-                        BigDecimal sellAmount = getQuantity(false);
-                        BigDecimal profitUsdt = lastPrice.subtract(curMarketPrice).multiply(sellAmount);
-                        SellMarketRequest request = new SellMarketRequest();
+            try {
+                GetTickerPriceResponse responseBody = binanceApi.getTickerPrice(coinType);
+                if (responseBody != null) {
+                    int rightSize = responseBody.price.split("\\.")[1].length();
+                    BigDecimal curMarketPrice = new BigDecimal(responseBody.price);
+                    if (nextBuyPrice.compareTo(curMarketPrice) > -1 && CalculateUtil.calculateAngle(coinType, "5m", false, rightSize)) {
+                        BuyMarketRequest request = new BuyMarketRequest();
                         request.symbol = coinType;
                         request.type = "MARKET";
-                        request.quantity = getQuantity(false);
-                        SellMarketResponse sellMarketResponse = binanceApi.sellMarket(request);
-                        if (sellMarketResponse != null && sellMarketResponse.orderId != null) {
-                            setRatio();
-                            modifyPrice(recordPrice.getLast(), curStep - 1, curMarketPrice);
+                        request.quantity = getQuantity(true);
+                        BuyMarketResponse buyMarketResponse = binanceApi.buyMarket(request);
+                        if (buyMarketResponse != null && buyMarketResponse.orderId != null) {
+                            dingDingApi.dingDingWarn("报警：币种为：%s。买单量为：%s.买单价格为：%s".format(coinType, request.quantity, buyMarketResponse.fills.get(0).price));
+                        } else {
+                            dingDingApi.dingDingWarn("报警：币种为：%s,买单失败".formatted(coinType));
                         }
+                    } else if (gridSellPrice.compareTo(curMarketPrice) == -1 && CalculateUtil.calculateAngle(coinType, "5m", false, rightSize)) {
+                        if (curStep == 0) {
+                            modifyPrice(gridSellPrice, curStep, curMarketPrice);
+                        } else {
+                            BigDecimal lastPrice = recordPrice.getLast();
+                            BigDecimal sellAmount = getQuantity(false);
+                            BigDecimal profitUsdt = lastPrice.subtract(curMarketPrice).multiply(sellAmount);
+                            SellMarketRequest request = new SellMarketRequest();
+                            request.symbol = coinType;
+                            request.type = "MARKET";
+                            request.quantity = getQuantity(false);
+                            SellMarketResponse sellMarketResponse = binanceApi.sellMarket(request);
+                            if (sellMarketResponse != null && sellMarketResponse.orderId != null) {
+                                setRatio();
+                                modifyPrice(recordPrice.getLast(), curStep - 1, curMarketPrice);
+                                removeRecordPrice();
+                                TimeUnit.SECONDS.sleep(50);
+                            }
+                        }
+                    } else {
+                        log.info("当前市价：{}。未能满足交易,继续运行", curMarketPrice);
                     }
-                } else {
-                    log.info("当前市价：{}。未能满足交易,继续运行", curMarketPrice);
                 }
+                TimeUnit.SECONDS.sleep(2);
+            } catch (Exception e) {
+                log.error("异常退出", e);
+                System.exit(-1);
             }
 
         }

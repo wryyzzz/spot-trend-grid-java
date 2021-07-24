@@ -5,7 +5,7 @@ ding_ding_token = a5006a6dc7a32dfad8b5d78e0a6ba507277fb5f2cb4076f5a68ba5ec0a1faa
 
 
 coin_type = BTCUSDT
-next_buy_price = 31300.0
+next_buy_price = 33870.0
 grid_sell_price = 34476.0
 step = 0
 profit_ratio = 2.0
