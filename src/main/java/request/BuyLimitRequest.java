@@ -1,5 +1,7 @@
 package request;
 
+import java.math.BigDecimal;
+
 public class BuyLimitRequest {
     public String symbol;
 
@@ -7,8 +9,8 @@ public class BuyLimitRequest {
 
     public String timeInForce;
 
-    public Double quantity;
+    public BigDecimal quantity;
 
-    public Double price;
+    public BigDecimal price;
 
 }

@@ -4,25 +4,40 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.URLUtil;
 import cn.hutool.crypto.digest.HMac;
 import cn.hutool.crypto.digest.HmacAlgorithm;
+import cn.hutool.log.Log;
+import cn.hutool.log.LogFactory;
+import com.ejlchina.data.Array;
+import com.ejlchina.data.TypeRef;
 import com.ejlchina.okhttps.HTTP;
 import com.ejlchina.okhttps.HttpResult;
+import com.ejlchina.okhttps.JacksonMsgConvertor;
 import request.*;
+import response.BuyMarketResponse;
+import response.GetTickerPriceResponse;
+import response.SellMarketResponse;
 
+import java.lang.reflect.Type;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.net.ResponseCache;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.StringJoiner;
+import java.util.*;
 import java.util.stream.Collectors;
 
 
 public class BinanceApi {
+    private static final Log log = LogFactory.get();
 
-    private static final HTTP BASE_URL_BUILDER = HTTP.builder().baseUrl("https://www.binance.com/api/v1").build();
-    private static final HTTP FUTURE_URL_BUILDER = HTTP.builder().baseUrl("https://fapi.binance.com").build();
-    private static final HTTP BASE_URL_V3_BUILDER = HTTP.builder().baseUrl("https://api.binance.com/api/v3").build();
-    private static final HTTP PUBLIC_URL_BUILDER = HTTP.builder().baseUrl("https://www.binance.com/exchange/public/product").build();
+    private static final HTTP BASE_URL_BUILDER = HTTP.builder().baseUrl("https://www.binance.com/api/v1")
+            .addMsgConvertor(new JacksonMsgConvertor()).build();
+    private static final HTTP FUTURE_URL_BUILDER = HTTP.builder().baseUrl("https://fapi.binance.com")
+            .addMsgConvertor(new JacksonMsgConvertor()).build();
+    private static final HTTP BASE_URL_V3_BUILDER = HTTP.builder().baseUrl("https://api.binance.com/api/v3")
+            .addMsgConvertor(new JacksonMsgConvertor()).build();
+    private static final HTTP PUBLIC_URL_BUILDER = HTTP.builder().baseUrl("https://www.binance.com/exchange/public/product")
+            .addMsgConvertor(new JacksonMsgConvertor()).build();
 
     private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("#.00000000");
 
@@ -35,12 +50,30 @@ public class BinanceApi {
     }
 
 
-    public HttpResult getTickerPrice(GetTickerPriceRequest request) {
-        return noSignGet(BASE_URL_V3_BUILDER, "/ticker/price", BeanUtil.beanToMap(request));
+    public GetTickerPriceResponse getTickerPrice(String coinType) {
+        HttpResult httpResult = noSignGet(BASE_URL_V3_BUILDER, "/ticker/price", Map.of("symbol", coinType));
+        if (httpResult.getStatus() == 200) {
+            return httpResult.getBody().toBean(GetTickerPriceResponse.class);
+        } else {
+            log.error("获取当前虚拟货币价格失败,coinType:{},response:{},body:{}", coinType, httpResult, httpResult.getBody());
+            return null;
+        }
     }
 
-    public HttpResult getKlines(GetKlinesRequest request) {
-        return noSignGet(BASE_URL_BUILDER, "/klines", BeanUtil.beanToMap(request));
+    public List<List<BigDecimal>> getKlines(GetKlinesRequest request) {
+        HttpResult httpResult = noSignGet(BASE_URL_BUILDER, "/klines", BeanUtil.beanToMap(request));
+        if (httpResult.getStatus() == 200) {
+            return httpResult.getBody()
+                    .toBean(new TypeRef<>() {
+                        @Override
+                        public Type getType() {
+                            return super.getType();
+                        }
+                    });
+        } else {
+            log.error("获取k线图失败,request:{},response:{},body:{}", request, httpResult, httpResult.getBody());
+            return Collections.emptyList();
+        }
     }
 
     public HttpResult buyLimit(BuyLimitRequest request) {
@@ -59,18 +92,29 @@ public class BinanceApi {
         return signPost(BASE_URL_V3_BUILDER, "/order", ret);
     }
 
-    public HttpResult buyMarket(BuyMarketRequest request) {
+    public BuyMarketResponse buyMarket(BuyMarketRequest request) {
         Map<String, Object> ret = BeanUtil.beanToMap(request);
         ret.put("side", "BUY");
-        return signPost(BASE_URL_V3_BUILDER, "/order", ret);
+        HttpResult httpResult = signPost(BASE_URL_V3_BUILDER, "/order", ret);
+        if (httpResult.getStatus() == 200) {
+            return httpResult.getBody().toBean(BuyMarketResponse.class);
+        } else {
+            log.error("挂买单失败,request:{},response:{},body:{}", request, httpResult, httpResult.getBody());
+            return null;
+        }
 
     }
 
-    public HttpResult sellMarket(SellMarketRequest request) {
+    public SellMarketResponse sellMarket(SellMarketRequest request) {
         Map<String, Object> ret = BeanUtil.beanToMap(request);
         ret.put("side", "SELL");
-        return signPost(BASE_URL_V3_BUILDER, "/order", BeanUtil.beanToMap(request));
-
+        HttpResult httpResult = signPost(BASE_URL_V3_BUILDER, "/order", BeanUtil.beanToMap(request));
+        if (httpResult.getStatus() == 200) {
+            return httpResult.getBody().toBean(SellMarketResponse.class);
+        }else {
+            log.error("挂卖单失败,request:{},response:{},body:{}", request, httpResult, httpResult.getBody());
+            return null;
+        }
     }
 
     public HttpResult getTicker24hour(GetTicker24hourRequest request) {
@@ -119,8 +163,8 @@ public class BinanceApi {
                 .get();
     }
 
-    private Double formatDouble(Double val) {
-        return val != null ? Double.valueOf(DECIMAL_FORMAT.format(val)) : val;
+    private BigDecimal formatDouble(BigDecimal val) {
+        return val != null ? val.setScale(8, RoundingMode.HALF_UP) : val;
     }
 
     private String sign(Map<String, Object> params) {
