@@ -15,6 +15,7 @@ import utils.CalculateUtil;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -40,7 +41,13 @@ public class App extends Module {
 
 
     public static void main(String[] args) throws Exception {
-        new App().start();
+        App app = new App();
+        BuyMarketRequest request = new BuyMarketRequest();
+        request.symbol = app.coinType;
+        request.type = "MARKET";
+        request.quantity = "0.00000001";
+        BuyMarketResponse buyMarketResponse = app.binanceApi.buyMarket(request);
+        System.out.println(buyMarketResponse);
     }
 
     @Override

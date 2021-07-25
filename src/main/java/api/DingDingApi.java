@@ -28,11 +28,13 @@ public class DingDingApi {
         Map<String, Object> ret = BeanUtil.beanToMap(request);
         ret.put("at", BeanUtil.beanToMap(request.at));
         ret.put("text", BeanUtil.beanToMap(request.text));
-        return DING_DING_URL_BUILDER.sync("/robot/send")
+        HttpResult result = DING_DING_URL_BUILDER.sync("/robot/send")
                 .addHeader("Content-Type", "application/json;charset=utf-8")
                 .addUrlPara(tokenUrlParam)
                 .bodyType("json")
                 .setBodyPara(ret)
                 .post();
+        result.close();
+        return result;
     }
 }

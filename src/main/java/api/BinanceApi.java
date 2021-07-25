@@ -13,11 +13,15 @@ import com.ejlchina.okhttps.HttpResult;
 import com.ejlchina.okhttps.JacksonMsgConvertor;
 import com.ejlchina.okhttps.internal.SyncHttpTask;
 import okhttp3.OkHttpClient;
+import okhttp3.logging.HttpLoggingInterceptor;
 import request.*;
 import response.BuyMarketResponse;
 import response.GetTickerPriceResponse;
 import response.SellMarketResponse;
+import utils.UserAgentUtil;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -43,26 +47,18 @@ public class BinanceApi {
 
     private static final Map<HTTP, Integer> CALL_NUMBER = new HashMap<>();
 
-    private static final Deque<String> USER_AGENT = new LinkedList<>();
 
     private final String apiKey;
     private final HMac hMac;
 
     public BinanceApi(String apiKey, String apiSecret) {
         this.apiKey = apiKey;
-        hMac = new HMac(HmacAlgorithm.HmacSHA256, apiSecret.getBytes());
+        hMac = new HMac(HmacAlgorithm.HmacSHA256, apiSecret.getBytes(StandardCharsets.UTF_8));
         CALL_NUMBER.put(BASE_URL_BUILDER, 0);
         CALL_NUMBER.put(FUTURE_URL_BUILDER, 0);
         CALL_NUMBER.put(BASE_URL_V3_BUILDER, 0);
         CALL_NUMBER.put(PUBLIC_URL_BUILDER, 0);
-        Collections.addAll(USER_AGENT, "Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6_8; en-us) AppleWebKit/534.50 (KHTML, like Gecko) Version/5.1 Safari/534.50",
-                "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.163 Safari/535.1",
-                "Opera/9.80 (Windows NT 6.1; U; zh-cn) Presto/2.9.168 Version/11.50",
-                "Mozilla/5.0 (Windows; U; Windows NT 6.1; ) AppleWebKit/534.12 (KHTML, like Gecko) Maxthon/3.0",
-                "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/13.0.782.41 Safari/5",
-                "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.101 Safari/537.36",
-                "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.0)",
-                "Mozilla/5.0 (Macintosh; U; PPC Mac OS X 10.5; en-US; rv:1.9.2.15) Gecko/20110303 Firefox/3.6.15");
+
     }
 
 
@@ -110,7 +106,7 @@ public class BinanceApi {
         request.quantity = formatDouble(request.quantity);
         Map<String, Object> ret = BeanUtil.beanToMap(request);
         ret.put("side", "BUY");
-        HttpResult httpResult = signPost(BASE_URL_V3_BUILDER, "/order", ret);
+        HttpResult httpResult = signPost(BASE_URL_V3_BUILDER, "/order/test", ret);
         try {
             if (httpResult.getStatus() == 200) {
                 return httpResult.getBody().toBean(BuyMarketResponse.class);
@@ -149,14 +145,14 @@ public class BinanceApi {
 
 
     private HttpResult signGet(HTTP http, String url, Map<String, Object> urlParam) {
-        urlParam.put("recvWindow", 55000);
-        urlParam.put("timestamp", System.currentTimeMillis() / 1000L);
+        urlParam.put("recvWindow", 5000);
+        urlParam.put("timestamp", System.currentTimeMillis());
         String signature = sign(urlParam);
         urlParam.put("signature", signature);
 
         return http.sync(url)
                 .addUrlPara(urlParam)
-                .addHeader("User-Agent", getUserAgent())
+                .addHeader("User-Agent", UserAgentUtil.getUserAgent())
                 .addHeader("X-MBX-APIKEY", apiKey)
 //                .addHeader("Connection", "close")
                 .get();
@@ -165,13 +161,13 @@ public class BinanceApi {
     }
 
     private HttpResult signPost(HTTP http, String url, Map<String, Object> bodyParam) {
-        bodyParam.put("recvWindow", 55000);
-        bodyParam.put("timestamp", System.currentTimeMillis() / 1000L);
+        bodyParam.put("recvWindow", 5000);
+        bodyParam.put("timestamp", System.currentTimeMillis());
         String signature = sign(bodyParam);
         bodyParam.put("signature", signature);
         return http.sync(url)
                 .addBodyPara(bodyParam)
-                .addHeader("User-Agent", getUserAgent())
+                .addHeader("User-Agent", UserAgentUtil.getUserAgent())
 //                .addHeader("Connection", "close")
                 .addHeader("X-MBX-APIKEY", apiKey)
                 .post();
@@ -180,7 +176,7 @@ public class BinanceApi {
     private HttpResult noSignGet(HTTP http, String url, Map<String, Object> urlParam) {
         return http.sync(url)
                 .addUrlPara(urlParam)
-                .addHeader("User-Agent", getUserAgent())
+                .addHeader("User-Agent", UserAgentUtil.getUserAgent())
 //                .addHeader("Connection", "close")
                 .get();
 
@@ -188,7 +184,7 @@ public class BinanceApi {
 
     private HttpResult noSignPost(HTTP http, String url, Map<String, Object> bodyParam) {
         return http.sync(url)
-                .addHeader("User-Agent", getUserAgent())
+                .addHeader("User-Agent", UserAgentUtil.getUserAgent())
 //                .addHeader("Connection", "close")
                 .addBodyPara(bodyParam)
                 .post();
@@ -203,14 +199,8 @@ public class BinanceApi {
                 .stream()
                 .map(v -> v.getKey() + "=" + v.getValue())
                 .collect(Collectors.joining("&"));
+        urlEncode = urlEncode.substring(0, urlEncode.length() - 2);
         return hMac.digestHex(urlEncode);
     }
-
-    private String getUserAgent() {
-        String userAgent = USER_AGENT.removeLast();
-        USER_AGENT.addFirst(userAgent);
-        return userAgent;
-    }
-
 
 }
