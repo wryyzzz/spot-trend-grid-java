@@ -2,6 +2,8 @@ import api.BinanceApi;
 import api.DingDingApi;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
+import com.ejlchina.okhttps.HTTP;
+import com.ejlchina.okhttps.HttpResult;
 import module.Module;
 import request.BuyMarketRequest;
 import request.GetKlinesRequest;
@@ -50,18 +52,20 @@ public class App extends Module {
                 if (responseBody != null) {
                     int rightSize = responseBody.price.split("\\.")[1].length();
                     BigDecimal curMarketPrice = new BigDecimal(responseBody.price);
-                    if (nextBuyPrice.compareTo(curMarketPrice) > -1 && CalculateUtil.calculateAngle(coinType, "5m", false, rightSize)) {
+                    int i = nextBuyPrice.compareTo(curMarketPrice);
+                    int j = gridSellPrice.compareTo(curMarketPrice);
+                    if (i > -1 && CalculateUtil.calculateAngle(coinType, "5m", false, rightSize)) {
                         BuyMarketRequest request = new BuyMarketRequest();
                         request.symbol = coinType;
                         request.type = "MARKET";
-                        request.quantity = getQuantity(true);
+                        request.quantity = getQuantity(true).toPlainString();
                         BuyMarketResponse buyMarketResponse = binanceApi.buyMarket(request);
                         if (buyMarketResponse != null && buyMarketResponse.orderId != null) {
                             dingDingApi.dingDingWarn("报警：币种为：%s。买单量为：%s.买单价格为：%s".format(coinType, request.quantity, buyMarketResponse.fills.get(0).price));
                         } else {
                             dingDingApi.dingDingWarn("报警：币种为：%s,买单失败".formatted(coinType));
                         }
-                    } else if (gridSellPrice.compareTo(curMarketPrice) == -1 && CalculateUtil.calculateAngle(coinType, "5m", false, rightSize)) {
+                    } else if (j == -1 && CalculateUtil.calculateAngle(coinType, "5m", false, rightSize)) {
                         if (curStep == 0) {
                             modifyPrice(gridSellPrice, curStep, curMarketPrice);
                         } else {
@@ -71,9 +75,10 @@ public class App extends Module {
                             SellMarketRequest request = new SellMarketRequest();
                             request.symbol = coinType;
                             request.type = "MARKET";
-                            request.quantity = getQuantity(false);
+                            request.quantity = getQuantity(false).toPlainString();
                             SellMarketResponse sellMarketResponse = binanceApi.sellMarket(request);
                             if (sellMarketResponse != null && sellMarketResponse.orderId != null) {
+                                dingDingApi.dingDingWarn("报警：币种为：%s。卖单量为：%s。预计盈利%sU".formatted(coinType, request.quantity, profitUsdt));
                                 setRatio();
                                 modifyPrice(recordPrice.getLast(), curStep - 1, curMarketPrice);
                                 removeRecordPrice();

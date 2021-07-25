@@ -7,5 +7,15 @@ public class SellMarketRequest {
 
     public String type;
 
-    public BigDecimal quantity;
+    public String quantity;
+
+
+    @Override
+    public String toString() {
+        return "SellMarketRequest{" +
+                "symbol='" + symbol + '\'' +
+                ", type='" + type + '\'' +
+                ", quantity=" + quantity +
+                '}';
+    }
 }

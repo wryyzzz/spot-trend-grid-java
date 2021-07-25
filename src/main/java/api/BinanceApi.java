@@ -43,6 +43,8 @@ public class BinanceApi {
 
     private static final Map<HTTP, Integer> CALL_NUMBER = new HashMap<>();
 
+    private static final Deque<String> USER_AGENT = new LinkedList<>();
+
     private final String apiKey;
     private final HMac hMac;
 
@@ -53,111 +55,124 @@ public class BinanceApi {
         CALL_NUMBER.put(FUTURE_URL_BUILDER, 0);
         CALL_NUMBER.put(BASE_URL_V3_BUILDER, 0);
         CALL_NUMBER.put(PUBLIC_URL_BUILDER, 0);
+        Collections.addAll(USER_AGENT, "Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10_6_8; en-us) AppleWebKit/534.50 (KHTML, like Gecko) Version/5.1 Safari/534.50",
+                "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/14.0.835.163 Safari/535.1",
+                "Opera/9.80 (Windows NT 6.1; U; zh-cn) Presto/2.9.168 Version/11.50",
+                "Mozilla/5.0 (Windows; U; Windows NT 6.1; ) AppleWebKit/534.12 (KHTML, like Gecko) Maxthon/3.0",
+                "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/535.1 (KHTML, like Gecko) Chrome/13.0.782.41 Safari/5",
+                "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.101 Safari/537.36",
+                "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.0)",
+                "Mozilla/5.0 (Macintosh; U; PPC Mac OS X 10.5; en-US; rv:1.9.2.15) Gecko/20110303 Firefox/3.6.15");
     }
 
 
     public GetTickerPriceResponse getTickerPrice(String coinType) {
         HttpResult httpResult = noSignGet(BASE_URL_V3_BUILDER, "/ticker/price", Map.of("symbol", coinType));
-        if (httpResult.getStatus() == 200) {
-            return httpResult.getBody().toBean(GetTickerPriceResponse.class);
-        } else {
-            log.error("获取当前虚拟货币价格失败,coinType:{},response:{},body:{}", coinType, httpResult, httpResult.getBody());
+        try {
+            if (httpResult.getStatus() == 200) {
+                return httpResult.getBody().toBean(GetTickerPriceResponse.class);
+            } else {
+                log.error("获取当前虚拟货币价格失败,coinType:{},body:{}", coinType, httpResult.getBody());
+                return null;
+            }
+        } catch (Exception e) {
+            log.error("获取当前虚拟货币价格异常", e);
             return null;
+        } finally {
+            httpResult.close();
         }
+
     }
 
     public List<List<BigDecimal>> getKlines(GetKlinesRequest request) {
         HttpResult httpResult = noSignGet(BASE_URL_BUILDER, "/klines", BeanUtil.beanToMap(request));
-        if (httpResult.getStatus() == 200) {
-            return httpResult.getBody()
-                    .toBean(new TypeRef<>() {
-                        @Override
-                        public Type getType() {
-                            return super.getType();
-                        }
-                    });
-        } else {
-            log.error("获取k线图失败,request:{},response:{},body:{}", request, httpResult, httpResult.getBody());
-            return Collections.emptyList();
+        try {
+            if (httpResult.getStatus() == 200) {
+                return httpResult.getBody().toBean(new TypeRef<>() {
+                    @Override
+                    public Type getType() {
+                        return super.getType();
+                    }
+                });
+            } else {
+                log.error("获取k线图失败,request:{},body:{}", request, httpResult.getBody());
+                return Collections.emptyList();
+            }
+        } catch (Exception e) {
+            log.error("获取K线图异常", e);
+            return null;
+        } finally {
+            httpResult.close();
         }
     }
 
-    public HttpResult buyLimit(BuyLimitRequest request) {
-        request.quantity = formatDouble(request.quantity);
-        request.price = formatDouble(request.price);
-        Map<String, Object> ret = BeanUtil.beanToMap(request);
-        ret.put("side", "BUY");
-        return signPost(BASE_URL_V3_BUILDER, "/order", ret);
-    }
-
-    public HttpResult sellLimit(SellLimitRequest request) {
-        request.quantity = formatDouble(request.quantity);
-        request.price = formatDouble(request.price);
-        Map<String, Object> ret = BeanUtil.beanToMap(request);
-        ret.put("side", "SELL");
-        return signPost(BASE_URL_V3_BUILDER, "/order", ret);
-    }
-
     public BuyMarketResponse buyMarket(BuyMarketRequest request) {
+        request.quantity = formatDouble(request.quantity);
         Map<String, Object> ret = BeanUtil.beanToMap(request);
         ret.put("side", "BUY");
         HttpResult httpResult = signPost(BASE_URL_V3_BUILDER, "/order", ret);
-        if (httpResult.getStatus() == 200) {
-            return httpResult.getBody().toBean(BuyMarketResponse.class);
-        } else {
-            log.error("挂买单失败,request:{},response:{},body:{}", request, httpResult, httpResult.getBody());
+        try {
+            if (httpResult.getStatus() == 200) {
+                return httpResult.getBody().toBean(BuyMarketResponse.class);
+            } else {
+                log.error("挂买单失败,request:{},body:{}", request, httpResult.getBody());
+                return null;
+            }
+        } catch (Exception e) {
+            log.error("挂买单异常", e);
             return null;
+        } finally {
+            httpResult.close();
         }
 
     }
 
     public SellMarketResponse sellMarket(SellMarketRequest request) {
+        request.quantity = formatDouble(request.quantity);
         Map<String, Object> ret = BeanUtil.beanToMap(request);
         ret.put("side", "SELL");
         HttpResult httpResult = signPost(BASE_URL_V3_BUILDER, "/order", BeanUtil.beanToMap(request));
-        if (httpResult.getStatus() == 200) {
-            return httpResult.getBody().toBean(SellMarketResponse.class);
-        } else {
-            log.error("挂卖单失败,request:{},response:{},body:{}", request, httpResult, httpResult.getBody());
+        try {
+            if (httpResult.getStatus() == 200) {
+                return httpResult.getBody().toBean(SellMarketResponse.class);
+            } else {
+                log.error("挂卖单失败,request:{},body:{}", request, httpResult.getBody());
+                return null;
+            }
+        } catch (Exception e) {
+            log.error("挂卖单失败", e);
             return null;
+        } finally {
+            httpResult.close();
         }
     }
 
-    public HttpResult getTicker24hour(GetTicker24hourRequest request) {
-        return noSignGet(BASE_URL_BUILDER, "/ticker/24hr", BeanUtil.beanToMap(request));
-    }
-
-    public HttpResult getPositionInfo(GetPositionInfoRequest request) {
-        return signGet(BASE_URL_BUILDER, "/positionRisk", BeanUtil.beanToMap(request));
-    }
-
-    public HttpResult getFuturePositionInfo(GetFuturePositionInfoRequest request) {
-        return signGet(FUTURE_URL_BUILDER, "/fapi/v2/positionRisk", BeanUtil.beanToMap(request));
-    }
 
     private HttpResult signGet(HTTP http, String url, Map<String, Object> urlParam) {
-        urlParam.put("recvWindow", 5000);
-        urlParam.put("timestamp", System.currentTimeMillis() / 500L);
+        urlParam.put("recvWindow", 55000);
+        urlParam.put("timestamp", System.currentTimeMillis() / 1000L);
         String signature = sign(urlParam);
         urlParam.put("signature", signature);
 
         return http.sync(url)
                 .addUrlPara(urlParam)
+                .addHeader("User-Agent", getUserAgent())
                 .addHeader("X-MBX-APIKEY", apiKey)
-                .addHeader("connection", "close")
+//                .addHeader("Connection", "close")
                 .get();
 
 
     }
 
     private HttpResult signPost(HTTP http, String url, Map<String, Object> bodyParam) {
-        bodyParam.put("recvWindow", 5000);
-        bodyParam.put("timestamp", System.currentTimeMillis() / 500L);
+        bodyParam.put("recvWindow", 55000);
+        bodyParam.put("timestamp", System.currentTimeMillis() / 1000L);
         String signature = sign(bodyParam);
         bodyParam.put("signature", signature);
         return http.sync(url)
                 .addBodyPara(bodyParam)
-                .addHeader("connection", "close")
+                .addHeader("User-Agent", getUserAgent())
+//                .addHeader("Connection", "close")
                 .addHeader("X-MBX-APIKEY", apiKey)
                 .post();
     }
@@ -165,20 +180,22 @@ public class BinanceApi {
     private HttpResult noSignGet(HTTP http, String url, Map<String, Object> urlParam) {
         return http.sync(url)
                 .addUrlPara(urlParam)
-                .addHeader("connection", "close")
+                .addHeader("User-Agent", getUserAgent())
+//                .addHeader("Connection", "close")
                 .get();
 
     }
 
     private HttpResult noSignPost(HTTP http, String url, Map<String, Object> bodyParam) {
         return http.sync(url)
-                .addHeader("connection", "close")
+                .addHeader("User-Agent", getUserAgent())
+//                .addHeader("Connection", "close")
                 .addBodyPara(bodyParam)
                 .post();
     }
 
-    private BigDecimal formatDouble(BigDecimal val) {
-        return val != null ? val.setScale(8, RoundingMode.HALF_UP) : val;
+    private String formatDouble(String val) {
+        return val != null ? new BigDecimal(val).setScale(8, RoundingMode.HALF_UP).toPlainString() : val;
     }
 
     private String sign(Map<String, Object> params) {
@@ -187,6 +204,12 @@ public class BinanceApi {
                 .map(v -> v.getKey() + "=" + v.getValue())
                 .collect(Collectors.joining("&"));
         return hMac.digestHex(urlEncode);
+    }
+
+    private String getUserAgent() {
+        String userAgent = USER_AGENT.removeLast();
+        USER_AGENT.addFirst(userAgent);
+        return userAgent;
     }
 
 

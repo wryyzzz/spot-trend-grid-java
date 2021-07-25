@@ -9,7 +9,7 @@ public class SellLimitRequest {
 
     public String timeInForce;
 
-    public BigDecimal quantity;
+    public String quantity;
 
-    public BigDecimal price;
+    public String price;
 }

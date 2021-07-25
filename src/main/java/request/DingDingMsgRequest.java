@@ -10,6 +10,15 @@ public class DingDingMsgRequest {
 
     public Text text;
 
+    @Override
+    public String toString() {
+        return "DingDingMsgRequest{" +
+                "msgtype='" + msgtype + '\'' +
+                ", at=" + at +
+                ", text=" + text +
+                '}';
+    }
+
     public static final class At {
         public Boolean isAtAll;
 
@@ -19,6 +28,14 @@ public class DingDingMsgRequest {
             this.isAtAll = isAtAll;
             this.atMobiles = atMobiles;
         }
+
+        @Override
+        public String toString() {
+            return "At{" +
+                    "isAtAll=" + isAtAll +
+                    ", atMobiles=" + atMobiles +
+                    '}';
+        }
     }
 
     public static final class Text {
@@ -26,6 +43,13 @@ public class DingDingMsgRequest {
 
         public Text(String content) {
             this.content = content;
+        }
+
+        @Override
+        public String toString() {
+            return "Text{" +
+                    "content='" + content + '\'' +
+                    '}';
         }
     }
 }

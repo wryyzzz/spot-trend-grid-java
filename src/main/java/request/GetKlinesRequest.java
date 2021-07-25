@@ -13,4 +13,16 @@ public class GetKlinesRequest {
     public LocalDateTime startTime;
 
     public LocalDateTime endTime;
+
+
+    @Override
+    public String toString() {
+        return "GetKlinesRequest{" +
+                "symbol='" + symbol + '\'' +
+                ", interval='" + interval + '\'' +
+                ", limit=" + limit +
+                ", startTime=" + startTime +
+                ", endTime=" + endTime +
+                '}';
+    }
 }
